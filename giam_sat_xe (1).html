@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giám sát xe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#d9dee2; --panel:#f4f6f7; --ink:#16202a; --muted:#5d6b78; --rule:#c3ccd3;
+  --accent:#ff6a1a; --accent-ink:#8a3200; --ok:#128a52; --warn:#b4540a; --stage:#0c1117;
+  --ui:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
+  --num:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 var(--ui);min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;align-items:center;gap:16px;padding:10px 18px;background:var(--ink);color:#fff;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font:600 22px/1 var(--num);letter-spacing:.02em}
+.sign{width:30px;height:30px;border-radius:6px;background:var(--accent);display:grid;place-items:center}
+.sign svg{width:20px;height:20px}
+.chip{margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;background:#ffffff1a;font-size:14px}
+.chip i{width:9px;height:9px;border-radius:50%;background:#e8b339}
+.chip.ok i{background:#3ddc97}.chip.bad i{background:#ff6b6b}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;padding:16px 18px;align-items:start}
+@media(max-width:980px){.layout{grid-template-columns:1fr}}
+
+.stage{background:var(--panel);border-radius:10px;padding:12px;border:1px solid var(--rule)}
+@media(min-width:981px){
+  .stage{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow-y:auto}
+}
+#stageWrap{display:flex;justify-content:center;background:var(--stage);border-radius:6px;padding:0}
+.viewport{position:relative;background:#000;overflow:hidden;touch-action:none}
+.viewport video,.viewport canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ov{cursor:crosshair}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:#cfd8df;
+  border:2px dashed #52606c;margin:14px;border-radius:8px;inset:0;background:transparent}
+.empty b{display:block;font:600 26px/1.15 var(--num);color:#fff;margin-bottom:6px}
+.empty button{margin-top:14px}
+.hidden{display:none!important}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.btn{border:1px solid var(--rule);background:#fff;border-radius:6px;padding:7px 12px;font-weight:500}
+.btn:hover{border-color:#8fa0ad}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1b0a00;font-weight:600}
+.btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+#seek{flex:1 1 180px;min-width:120px;accent-color:var(--accent)}
+.time{font:500 17px var(--num);min-width:98px;text-align:center}
+.hint{margin-top:8px;font-size:14px;color:var(--accent-ink);min-height:20px}
+.calib{display:flex;gap:8px;align-items:center;margin-top:6px}
+.calib input{width:90px;padding:6px 8px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+
+.side{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.card h2{margin:0 0 8px;font:600 19px/1.1 var(--num);letter-spacing:.01em}
+.cams{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:4px;max-height:150px;overflow:auto}
+.cams li button{width:100%;text-align:left;border:1px solid transparent;background:transparent;padding:6px 8px;border-radius:6px;display:flex;gap:8px;align-items:center}
+.cams li button:hover{background:#e6ebee}
+.cams li.cur button{background:#fff;border-color:var(--accent);font-weight:600}
+.cams .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cams .x{color:var(--muted);padding:0 6px;border-radius:4px}
+.cams .x:hover{background:#d5dbe0;color:var(--ink)}
+.addrow{display:flex;gap:8px;flex-wrap:wrap}
+.urlrow{display:flex;gap:6px;margin-top:8px}
+.urlrow input{flex:1;min-width:0;padding:7px 9px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+
+.tally{display:grid;grid-template-columns:1fr;gap:2px}
+.row{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule)}
+.row:last-child{border-bottom:0}
+.dot{width:14px;height:14px;border-radius:3px}
+.row .nm{font-weight:600}
+.row .sub{font-size:13px;color:var(--muted)}
+.row .big{font:600 34px/1 var(--num);text-align:right;min-width:52px}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:8px;border-top:2px solid var(--ink)}
+.total b{font:600 30px/1 var(--num)}
+
+.set{display:grid;gap:10px}
+.set label{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.set select,.set input[type=range]{width:55%}
+.set label.chk{align-items:flex-start}
+.set select{padding:6px 8px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+.set input[type=range]{accent-color:var(--accent)}
+.chk{justify-content:flex-start!important;gap:8px!important}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+
+.logwrap{max-height:230px;overflow:auto;border:1px solid var(--rule);border-radius:6px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:5px 8px;text-align:left;border-bottom:1px solid #e3e8ec}
+th{position:sticky;top:0;background:#eef1f3;font-weight:600}
+td.num{font-family:var(--num);font-size:16px}
+.logbar{display:flex;gap:8px;margin-top:8px}
+.dir-in{color:var(--ok);font-weight:600}.dir-out{color:var(--warn);font-weight:600}
+.note{font-size:13px;color:var(--muted);margin:8px 0 0}
+body.drag .stage{outline:3px dashed var(--accent);outline-offset:-3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="sign" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17V4M5 9l5-5 5 5"/></svg></span>
+    Giám sát xe
+  </div>
+  <div id="status" class="chip"><i></i><span id="statusText">Đang khởi động</span></div>
+</header>
+
+<div class="layout">
+  <section class="stage" aria-label="Màn hình giám sát">
+    <div id="stageWrap">
+      <div id="vp" class="viewport">
+        <video id="vid" playsinline muted></video>
+        <canvas id="ov"></canvas>
+        <div id="empty" class="empty">
+          <div>
+            <b>Chưa có video để giám sát</b>
+            Kéo thả file video vào đây, hoặc chọn từ máy
+            <br><button class="btn primary" id="emptyPick">Chọn video</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="play" disabled>Phát</button>
+      <input id="seek" type="range" min="0" max="1000" value="0" disabled aria-label="Tua video">
+      <span class="time" id="time">0:00 / 0:00</span>
+      <select id="rate" class="btn" aria-label="Tốc độ phát">
+        <option value="0.5">0,5x</option><option value="1" selected>1x</option><option value="1.5">1,5x</option><option value="2">2x</option>
+      </select>
+      <button class="btn" id="mute">Tắt tiếng</button>
+    </div>
+    <div class="controls">
+      <button class="btn" id="resetLine">Đặt lại vạch đếm</button>
+      <button class="btn" id="flip">Đổi chiều vào/ra</button>
+      <button class="btn" id="calibBtn">Hiệu chỉnh tốc độ</button>
+      <button class="btn" id="snap">Chụp ảnh</button>
+    </div>
+    <form id="calibForm" class="calib hidden">
+      <label for="calibM">Khoảng cách thật giữa 2 điểm</label>
+      <input id="calibM" type="number" min="0.1" step="0.1" value="3">
+      <span>mét</span>
+      <button class="btn primary" type="submit">Áp dụng</button>
+    </form>
+    <div class="hint" id="hint">Kéo hai đầu vạch xanh để đặt vị trí đếm xe.</div>
+  </section>
+
+  <aside class="side">
+    <section class="card">
+      <h2>Camera</h2>
+      <ul class="cams" id="cams"></ul>
+      <div class="addrow">
+        <button class="btn primary" id="addFile">Thêm video</button>
+        <button class="btn" id="addUrl">Dán link</button>
+        <button class="btn" id="addCam">Camera máy</button>
+      </div>
+      <form class="urlrow hidden" id="urlForm">
+        <input id="urlIn" type="url" placeholder="https://.../video.mp4" aria-label="Link video">
+        <button class="btn" type="submit">Thêm</button>
+      </form>
+      <input id="file" type="file" accept="video/*" multiple hidden>
+    </section>
+
+    <section class="card">
+      <h2>Số xe qua vạch</h2>
+      <div class="tally" id="tally"></div>
+      <div class="total"><span>Tổng phương tiện</span><b id="total">0</b></div>
+      <p class="note" id="liveNote">Đang trong khung hình: 0</p>
+      <p class="note" id="periodNote">Thời điểm: chưa có video</p>
+    </section>
+
+    <section class="card">
+      <h2>Thiết lập</h2>
+      <div class="set">
+        <label>Ngày hoặc đêm
+          <select id="dn">
+            <option value="auto">Tự nhận biết</option>
+            <option value="day">Luôn là ban ngày</option>
+            <option value="dusk">Luôn là chạng vạng</option>
+            <option value="night">Luôn là ban đêm</option>
+          </select>
+        </label>
+        <label>Cách nhận dạng
+          <select id="mode">
+            <option value="auto">Tự động</option>
+            <option value="ai">AI (COCO-SSD)</option>
+            <option value="motion">Chuyển động</option>
+          </select>
+        </label>
+        <label>Mô hình AI
+          <select id="base">
+            <option value="lite_mobilenet_v2">Nhanh</option>
+            <option value="mobilenet_v2">Chính xác hơn</option>
+          </select>
+        </label>
+        <label>Độ tin cậy tối thiểu
+          <input id="conf" type="range" min="0.5" max="0.9" step="0.05" value="0.5">
+        </label>
+        <label class="chk"><input id="optPerson" type="checkbox" checked> Đếm cả người đi bộ</label>
+        <label class="chk"><input id="optTrail" type="checkbox" checked> Vẽ vệt di chuyển</label>
+        <label class="chk"><input id="optSpeed" type="checkbox" checked> Hiện tốc độ</label>
+        <label class="chk"><input id="optLoop" type="checkbox" checked> Lặp lại video</label>
+        <label class="chk"><input id="optBright" type="checkbox" checked> Tăng sáng khi trời tối để AI dễ thấy xe</label>
+        <label class="chk"><input id="optSlow" type="checkbox" checked> Tự làm chậm video cho kịp nhận dạng</label>
+        <label class="chk"><input id="optHybrid" type="checkbox" checked> Bổ sung xe nhanh bằng chuyển động</label>
+      </div>
+      <p class="note" id="calibNote">Tốc độ đang là ước tính, chưa hiệu chỉnh.</p>
+    </section>
+
+    <section class="card">
+      <h2>Nhật ký qua vạch</h2>
+      <div class="logwrap">
+        <table>
+          <thead><tr><th>Giây</th><th>Loại</th><th>Chiều</th><th>km/h</th><th>Lúc</th></tr></thead>
+          <tbody id="log"></tbody>
+        </table>
+      </div>
+      <div class="logbar">
+        <button class="btn" id="csv">Xuất CSV</button>
+        <button class="btn" id="clear">Xóa số đếm</button>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const vid = $('#vid'), ov = $('#ov'), ctx = ov.getContext('2d'), vp = $('#vp');
+
+/* ---------- Phân loại ---------- */
+const CLS = {
+  car:        { n:'Ô tô',        c:'#ff7a2b' },
+  motorcycle: { n:'Xe máy',      c:'#1fbf75' },
+  bus:        { n:'Xe buýt',     c:'#3b82f6' },
+  truck:      { n:'Xe tải',      c:'#a855f7' },
+  bicycle:    { n:'Xe đạp',      c:'#14b8a6' },
+  person:     { n:'Người đi bộ', c:'#ec4899' }
+};
+const KEYS = Object.keys(CLS);
+
+/* ---------- Trạng thái ---------- */
+let sources = [], cur = null, curIdx = -1;
+let tracks = [], nextId = 1;
+let model = null, modelBase = null, modelState = 'idle'; // idle | loading | ready | failed
+let effMode = 'motion';
+let detFps = 0, tool = 'line', drag = null, calibPts = [];
+
+function newCounts(){ const o = {}; KEYS.forEach(k => o[k] = {in:0, out:0}); return o; }
+
+/* ---------- Nguồn video ---------- */
+function addSource(s){
+  s.counts = newCounts(); s.byPeriod = { day:0, dusk:0, night:0 }; s.scene = 'day'; s.luma = null; s.log = []; s.line = null; s.flip = false; s.mpp = null;
+  sources.push(s); selectSource(sources.length - 1);
+}
+function addFiles(files){
+  [...files].filter(f => f.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|m4v)$/i.test(f.name))
+    .forEach(f => addSource({ name:f.name, url:URL.createObjectURL(f) }));
+}
+function selectSource(i){
+  curIdx = i; cur = sources[i];
+  tracks = []; bg = null; calibPts = []; tool = 'line';
+  $('#calibForm').classList.add('hidden');
+  if (!cur){
+    vid.removeAttribute('src'); vid.srcObject = null; vid.load();
+    $('#empty').classList.remove('hidden');
+    setHint('Kéo hai đầu vạch xanh để đặt vị trí đếm xe.');
+    syncControls(); renderCams(); refreshPanels(); fit(); return;
+  }
+  $('#empty').classList.add('hidden');
+  vid.crossOrigin = 'anonymous';
+  if (cur.stream){ vid.srcObject = cur.stream; vid.loop = false; }
+  else { vid.srcObject = null; vid.src = cur.url; vid.loop = $('#optLoop').checked; }
+  vid.playbackRate = +$('#rate').value;
+  vid.play().catch(()=>{});
+  renderCams(); refreshPanels();
+}
+function removeSource(i){
+  const s = sources[i];
+  if (s.stream) s.stream.getTracks().forEach(t => t.stop());
+  sources.splice(i, 1);
+  if (!sources.length) selectSource(-1);
+  else selectSource(Math.min(i, sources.length - 1));
+}
+function renderCams(){
+  const ul = $('#cams'); ul.innerHTML = '';
+  sources.forEach((s, i) => {
+    const li = document.createElement('li'); if (i === curIdx) li.className = 'cur';
+    const b = document.createElement('button');
+    b.innerHTML = '<span class="nm"></span><span class="x" role="button" aria-label="Xóa camera">×</span>';
+    b.querySelector('.nm').textContent = 'Camera ' + (i + 1) + ': ' + s.name;
+    b.onclick = e => { if (e.target.classList.contains('x')) removeSource(i); else selectSource(i); };
+    li.appendChild(b); ul.appendChild(li);
+  });
+  if (!sources.length) ul.innerHTML = '<li style="color:var(--muted);padding:4px 8px">Chưa có camera nào.</li>';
+}
+
+vid.addEventListener('loadedmetadata', () => {
+  ov.width = vid.videoWidth; ov.height = vid.videoHeight;
+  if (cur && !cur.line){
+    const w = ov.width, h = ov.height;
+    cur.line = { a:{x:w*0.04, y:h*0.78}, b:{x:w*0.96, y:h*0.58} };
+    cur.mpp = 40 / w; cur.calibrated = false;
+  }
+  fit(); syncControls(); refreshPanels();
+});
+vid.addEventListener('seeked', () => { tracks = []; sampleScene(true); });
+vid.addEventListener('ended', () => { tracks = []; syncControls(); });
+vid.addEventListener('play', syncControls);
+vid.addEventListener('pause', syncControls);
+vid.addEventListener('timeupdate', () => {
+  if (!vid.duration || !isFinite(vid.duration)) return;
+  if (!seeking) $('#seek').value = Math.round(vid.currentTime / vid.duration * 1000);
+  $('#time').textContent = fmt(vid.currentTime) + ' / ' + fmt(vid.duration);
+});
+function fmt(t){ t = Math.max(0, t|0); return (t/60|0) + ':' + String(t%60).padStart(2,'0'); }
+
+function syncControls(){
+  const has = !!cur, live = !!(cur && cur.stream);
+  $('#play').disabled = !has; $('#seek').disabled = !has || live;
+  $('#play').textContent = (has && !vid.paused && !vid.ended) ? 'Tạm dừng' : 'Phát';
+  $('#calibNote').textContent = (cur && cur.calibrated)
+    ? 'Tốc độ đã hiệu chỉnh theo khoảng cách bạn nhập. Do góc nhìn, sai số vẫn có thể lớn.'
+    : 'Tốc độ đang là ước tính, chưa hiệu chỉnh.';
+  if (live) $('#time').textContent = 'Trực tiếp';
+}
+
+/* ---------- Bố cục ---------- */
+function fit(){
+  const st = $('#stageWrap');
+  const aw = Math.max(260, st.parentElement.clientWidth - 24);
+  const ah = Math.max(260, window.innerHeight - 250);
+  const ar = (vid.videoWidth && vid.videoHeight) ? vid.videoWidth / vid.videoHeight : 16 / 9;
+  let w = aw, h = w / ar;
+  if (h > ah){ h = ah; w = h * ar; }
+  vp.style.width = w + 'px'; vp.style.height = h + 'px';
+}
+addEventListener('resize', fit);
+
+/* ---------- Tải mô hình AI ---------- */
+function loadScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Không tải được ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function ensureModel(){
+  const want = $('#base').value;
+  if (modelState === 'ready' && modelBase === want) return;
+  modelState = 'loading'; model = null; updateStatus();
+  try{
+    if (!window.tf) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+    if (!window.cocoSsd) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js');
+    model = await cocoSsd.load({ base: want });
+    modelBase = want; modelState = 'ready';
+  }catch(e){
+    console.warn(e); modelState = 'failed';
+  }
+  updateStatus();
+}
+function updateStatus(){
+  const m = $('#mode').value;
+  effMode = (m === 'motion') ? 'motion' : (modelState === 'ready' ? 'ai' : 'motion');
+  const el = $('#status'), tx = $('#statusText');
+  el.className = 'chip';
+  if (m !== 'motion' && modelState === 'loading'){ tx.textContent = 'Đang tải mô hình AI, vui lòng chờ'; }
+  else if (effMode === 'ai'){ el.classList.add('ok'); tx.textContent = 'AI đang chạy (COCO-SSD)' + (detFps ? ', ' + detFps.toFixed(0) + ' khung/giây' : '') + (effRate < 0.95 ? ', video x' + effRate.toFixed(2) : ''); }
+  else if (m === 'ai' && modelState === 'failed'){ el.classList.add('bad'); tx.textContent = 'Không tải được AI, cần mạng. Đang dùng chế độ chuyển động'; }
+  else if (m === 'auto' && modelState === 'failed'){ el.classList.add('bad'); tx.textContent = 'Không tải được AI, đang dùng chế độ chuyển động'; }
+  else { tx.textContent = 'Chế độ chuyển động' + (detFps ? ', ' + detFps.toFixed(0) + ' khung/giây' : ''); }
+}
+
+/* ---------- Ngày hoặc đêm ---------- */
+const PERIOD = { day:'Ngày', dusk:'Chạng vạng', night:'Đêm' };
+const PERIOD_LONG = { day:'Ban ngày', dusk:'Chạng vạng', night:'Ban đêm' };
+const sc = document.createElement('canvas'); sc.width = sc.height = 48;
+const sg = sc.getContext('2d', { willReadFrequently:true });
+let lastScene = 0;
+function sampleScene(force){
+  const now = performance.now();
+  if (!cur || !vid.videoWidth || (!force && now - lastScene < 500)) return;
+  lastScene = now;
+  const mode = $('#dn').value;
+  sg.drawImage(vid, 0, 0, 48, 48);
+  const d = sg.getImageData(0, 0, 48, 48).data; let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2];
+  const luma = sum / (d.length / 4);
+  cur.luma = cur.luma == null ? luma : cur.luma * 0.7 + luma * 0.3;
+  if (mode !== 'auto'){ cur.scene = mode; return; }
+  const l = cur.luma, prev = cur.scene || 'day';
+  if (prev === 'day') cur.scene = l < 50 ? 'night' : (l < 85 ? 'dusk' : 'day');
+  else if (prev === 'dusk') cur.scene = l > 105 ? 'day' : (l < 45 ? 'night' : 'dusk');
+  else cur.scene = l > 105 ? 'day' : (l > 65 ? 'dusk' : 'night');
+}
+let bc = null;
+function aiSource(){
+  if (!$('#optBright').checked || !cur || cur.scene === 'day') return vid;
+  if (!bc) bc = document.createElement('canvas');
+  bc.width = vid.videoWidth; bc.height = vid.videoHeight;
+  const g = bc.getContext('2d');
+  g.filter = cur.scene === 'night' ? 'brightness(2.2) contrast(1.15)' : 'brightness(1.5) contrast(1.1)';
+  g.drawImage(vid, 0, 0); g.filter = 'none';
+  return bc;
+}
+
+/* ---------- Nhận dạng ---------- */
+async function detectAI(){
+  const preds = await model.detect(aiSource(), 40);
+  const minS = +$('#conf').value, person = $('#optPerson').checked, out = [];
+  for (const p of preds){
+    if (!CLS[p.class] || p.score < minS) continue;
+    if (p.class === 'person' && !person) continue;
+    out.push({ x:p.bbox[0], y:p.bbox[1], w:p.bbox[2], h:p.bbox[3], cls:p.class, score:p.score });
+  }
+  return out;
+}
+
+// Chế độ chuyển động: trừ nền + phân loại theo kích thước
+const mc = document.createElement('canvas'), mx = mc.getContext('2d', { willReadFrequently:true });
+let bg = null;
+function detectMotion(){
+  const W = 160, w = vid.videoWidth, h = vid.videoHeight; if (!w) return [];
+  const H = Math.round(W * h / w); mc.width = W; mc.height = H;
+  mx.drawImage(vid, 0, 0, W, H);
+  const d = mx.getImageData(0, 0, W, H).data, n = W * H;
+  if (!bg || bg.length !== n){ bg = new Float32Array(n); for (let i = 0; i < n; i++) bg[i] = d[i*4]*0.3 + d[i*4+1]*0.59 + d[i*4+2]*0.11; return []; }
+  const mask = new Uint8Array(n);
+  for (let i = 0; i < n; i++){
+    const g = d[i*4]*0.3 + d[i*4+1]*0.59 + d[i*4+2]*0.11;
+    mask[i] = Math.abs(g - bg[i]) > ((cur && cur.scene === 'night') ? 16 : 26) ? 1 : 0;
+    bg[i] += (g - bg[i]) * 0.03;
+  }
+  // làm dày vùng chuyển động 1 điểm ảnh
+  const m2 = new Uint8Array(n);
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++){
+    const i = y*W + x;
+    if (mask[i] || mask[i-1] || mask[i+1] || mask[i-W] || mask[i+W]) m2[i] = 1;
+  }
+  const seen = new Uint8Array(n), out = [], sx = w / W, sy = h / H, minA = n * 0.0012;
+  const stack = [];
+  for (let s = 0; s < n; s++){
+    if (!m2[s] || seen[s]) continue;
+    let x0 = W, y0 = H, x1 = 0, y1 = 0, area = 0;
+    stack.push(s); seen[s] = 1;
+    while (stack.length){
+      const i = stack.pop(), x = i % W, y = (i / W) | 0; area++;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+        const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const j = ny*W + nx; if (m2[j] && !seen[j]){ seen[j] = 1; stack.push(j); }
+      }
+    }
+    if (area < minA) continue;
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, rel = (bw * bh) / n, ar = bw / bh;
+    let cls;
+    if (rel > 0.045) cls = ar > 2.2 ? 'bus' : 'truck';
+    else if (rel > 0.012) cls = 'car';
+    else if (rel > 0.004) cls = 'motorcycle';
+    else cls = $('#optPerson').checked ? 'person' : 'motorcycle';
+    out.push({ x:x0*sx, y:y0*sy, w:bw*sx, h:bh*sy, cls, score:1 });
+  }
+  return out;
+}
+
+/* ---------- Theo dõi ---------- */
+function iou(a, b){
+  const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y), x2 = Math.min(a.x + a.w, b.x + b.w), y2 = Math.min(a.y + a.h, b.y + b.h);
+  const i = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  return i / (a.w*a.h + b.w*b.h - i + 1e-6);
+}
+function ingest(dets, vt){
+  const pairs = [];
+  tracks.forEach((t, ti) => {
+    const dt = vt - t.t, px = t.cx + t.vx * dt, py = t.cy + t.vy * dt;
+    dets.forEach((d, di) => {
+      const dcx = d.x + d.w/2, dcy = d.y + d.h/2;
+      const dist = Math.hypot(dcx - px, dcy - py) / Math.max(t.w, t.h, d.w, d.h);
+      const ov_ = iou({x:px - t.w/2, y:py - t.h/2, w:t.w, h:t.h}, d);
+      if (dist < 1.3 && (d.cls === t.cls || ov_ > 0.2 || dist < 0.5)) pairs.push({ ti, di, cost: dist - ov_ });
+    });
+  });
+  pairs.sort((a, b) => a.cost - b.cost);
+  const usedT = new Set(), usedD = new Set();
+  for (const p of pairs){
+    if (usedT.has(p.ti) || usedD.has(p.di)) continue;
+    usedT.add(p.ti); usedD.add(p.di);
+    updateTrack(tracks[p.ti], dets[p.di], vt);
+  }
+  dets.forEach((d, di) => { if (!usedD.has(di)) createTrack(d, vt); });
+  tracks = tracks.filter(t => vt - t.t < 1.0);
+}
+function createTrack(d, vt){
+  const t = { id:nextId++, cx:d.x + d.w/2, cy:d.y + d.h/2, w:d.w, h:d.h, vx:0, vy:0, t:vt, kmh:0,
+              votes:{}, cls:d.cls, hits:1, counted:false, trail:[] };
+  t.votes[d.cls] = d.score; t.px = t.cx; t.py = t.cy + t.h/2; tracks.push(t);
+}
+function updateTrack(t, d, vt){
+  const cx = d.x + d.w/2, cy = d.y + d.h/2, dt = vt - t.t;
+  if (dt > 0.02){
+    const vx = (cx - t.cx) / dt, vy = (cy - t.cy) / dt;
+    t.vx = t.vx * 0.6 + vx * 0.4; t.vy = t.vy * 0.6 + vy * 0.4;
+    const spd = Math.hypot(t.vx, t.vy) * ((cur && cur.mpp) || 0.05) * 3.6;
+    t.kmh = t.kmh * 0.7 + (spd < 2 ? 0 : spd) * 0.3;
+  }
+  t.px = t.cx; t.py = t.cy + t.h/2;
+  t.cx = cx; t.cy = cy; t.w = t.w*0.5 + d.w*0.5; t.h = t.h*0.5 + d.h*0.5; t.t = vt; t.hits++;
+  t.votes[d.cls] = (t.votes[d.cls] || 0) + d.score;
+  t.cls = Object.keys(t.votes).reduce((a, b) => t.votes[a] >= t.votes[b] ? a : b);
+  t.trail.push({ x:cx, y:cy + t.h/2 }); if (t.trail.length > 30) t.trail.shift();
+  if (!t.counted && t.hits >= 2 && cur && cur.line) checkCross(t, vt);
+}
+function sideOf(L, p){ return (L.b.x - L.a.x) * (p.y - L.a.y) - (L.b.y - L.a.y) * (p.x - L.a.x); }
+function checkCross(t, vt){
+  const L = cur.line, p0 = { x:t.px, y:t.py }, p1 = { x:t.cx, y:t.cy + t.h/2 };
+  const s0 = sideOf(L, p0), s1 = sideOf(L, p1);
+  if (s0 === 0 || s0 * s1 >= 0) return;
+  const k = s0 / (s0 - s1), x = p0.x + (p1.x - p0.x) * k, y = p0.y + (p1.y - p0.y) * k;
+  const abx = L.b.x - L.a.x, aby = L.b.y - L.a.y;
+  const u = ((x - L.a.x) * abx + (y - L.a.y) * aby) / (abx*abx + aby*aby);
+  if (u < 0 || u > 1) return;
+  let dir = s1 > 0 ? 'in' : 'out'; if (cur.flip) dir = dir === 'in' ? 'out' : 'in';
+  t.counted = true; cur.counts[t.cls][dir]++;
+  const per = cur.scene || 'day'; cur.byPeriod[per]++;
+  cur.log.unshift({ t:vt, id:t.id, cls:t.cls, dir, kmh:Math.round(t.kmh), per });
+  if (cur.log.length > 500) cur.log.pop();
+  panelDirty = true;
+}
+
+/* ---------- Vòng lặp nhận dạng ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let effRate = 1;
+function overlapFrac(a, b){
+  const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y), x2 = Math.min(a.x + a.w, b.x + b.w), y2 = Math.min(a.y + a.h, b.y + b.h);
+  return Math.max(0, x2 - x1) * Math.max(0, y2 - y1) / (Math.min(a.w*a.h, b.w*b.h) + 1e-6);
+}
+async function detectLoop(){
+  let last = performance.now();
+  for (;;){
+    if (!cur || vid.readyState < 2 || vid.paused || vid.ended){ await sleep(120); continue; }
+    const t0 = performance.now(), vt = vid.currentTime;
+    sampleScene();
+    let dets = [];
+    try{
+      if (effMode === 'ai' && model){
+        dets = await detectAI();
+        if ($('#optHybrid').checked){
+          const extra = detectMotion().filter(b => b.cls !== 'person' && !dets.some(d => overlapFrac(b, d) > 0.3));
+          extra.forEach(b => b.score = 0.6);
+          dets = dets.concat(extra);
+        }
+      } else dets = detectMotion();
+    }catch(e){ console.warn(e); await sleep(300); continue; }
+    if (Math.abs(vid.currentTime - vt) < 2) ingest(dets, vt);
+    const now = performance.now(), lat = (now - t0) / 1000;
+    detFps = detFps * 0.8 + (1000 / (now - last)) * 0.2; last = now;
+
+    // Làm chậm video để mỗi giây video có ít nhất ~15 lần nhận dạng
+    const userRate = +$('#rate').value;
+    if (cur && !cur.stream && $('#optSlow').checked){
+      const want = Math.min(userRate, Math.max(0.1, (1 / 15) / Math.max(lat, 0.01)));
+      effRate = effRate * 0.6 + want * 0.4;
+    } else effRate = userRate;
+    if (Math.abs(vid.playbackRate - effRate) > 0.02) vid.playbackRate = Math.min(4, Math.max(0.1, effRate));
+
+    await new Promise(r => requestAnimationFrame(r));
+    if (effMode === 'motion') await sleep(30);
+  }
+}
+
+/* ---------- Vẽ lớp phủ ---------- */
+const FONT = '"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif';
+function chip(text, x, y, color, k){
+  ctx.font = '600 ' + (15*k) + 'px ' + FONT;
+  const pad = 5*k, w = ctx.measureText(text).width + pad*2, h = 21*k;
+  const yy = y - h < 0 ? y : y - h;
+  ctx.fillStyle = color; ctx.fillRect(x, yy, w, h);
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + pad, yy + h/2 + k*0.5);
+}
+function drawHud(k){
+  const L = cur.counts, lines = ['Đếm qua vạch', 'Vạch 1:'];
+  const outs = KEYS.filter(c => L[c].out), ins = KEYS.filter(c => L[c].in);
+  if (outs.length){ lines.push('Ra:'); outs.forEach(c => lines.push('   ' + CLS[c].n + ': ' + L[c].out)); }
+  if (ins.length){ lines.push('Vào:'); ins.forEach(c => lines.push('   ' + CLS[c].n + ': ' + L[c].in)); }
+  if (lines.length === 2) lines.push('Chưa có xe qua vạch');
+  ctx.font = '600 ' + (15*k) + 'px ' + FONT;
+  const lh = 19*k, pad = 8*k; let w = 0; lines.forEach(s => w = Math.max(w, ctx.measureText(s).width));
+  w += pad*2; const h = lines.length * lh + pad*2, x = ov.width - w - 8*k, y = 8*k;
+  ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#10161c'; ctx.textBaseline = 'middle';
+  lines.forEach((s, i) => { ctx.font = (i < 2 ? '600 ' : '500 ') + (15*k) + 'px ' + FONT; ctx.fillText(s, x + pad, y + pad + lh*i + lh/2); });
+}
+function draw(){
+  requestAnimationFrame(draw);
+  ctx.clearRect(0, 0, ov.width, ov.height);
+  if (!cur || !ov.width) return;
+  const rect = ov.getBoundingClientRect(), k = rect.width ? ov.width / rect.width : 1;
+  const vt = vid.currentTime, moving = !vid.paused && !vid.ended;
+  const showTrail = $('#optTrail').checked, showSpeed = $('#optSpeed').checked;
+  let live = 0;
+
+  for (const t of tracks){
+    if (t.hits < 2 || vt - t.t > 0.9) continue;
+    live++;
+    const dtp = moving ? Math.min(Math.max(vt - t.t, 0), 0.35) : 0;
+    const cx = t.cx + t.vx * dtp, cy = t.cy + t.vy * dtp, c = CLS[t.cls].c;
+    if (showTrail && t.trail.length > 1){
+      ctx.strokeStyle = c; ctx.lineWidth = 2*k; ctx.globalAlpha = 0.7; ctx.beginPath();
+      t.trail.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = c; ctx.lineWidth = 2*k;
+    ctx.strokeRect(cx - t.w/2, cy - t.h/2, t.w, t.h);
+    chip(CLS[t.cls].n + (showSpeed && t.kmh >= 3 ? ' ' + Math.round(t.kmh) + ' km/h' : ''), cx - t.w/2, cy - t.h/2, c, k);
+  }
+
+  // vạch đếm
+  const L = cur.line;
+  if (L){
+    ctx.strokeStyle = '#19d27a'; ctx.lineWidth = 3*k; ctx.beginPath(); ctx.moveTo(L.a.x, L.a.y); ctx.lineTo(L.b.x, L.b.y); ctx.stroke();
+    [L.a, L.b].forEach(p => { ctx.fillStyle = '#19d27a'; ctx.beginPath(); ctx.arc(p.x, p.y, 8*k, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2*k; ctx.stroke(); });
+    const tin = KEYS.reduce((s, c) => s + cur.counts[c].in, 0), tout = KEYS.reduce((s, c) => s + cur.counts[c].out, 0);
+    const mx_ = (L.a.x + L.b.x)/2, my = (L.a.y + L.b.y)/2;
+    ctx.font = '600 ' + (16*k) + 'px ' + FONT;
+    [['vào: ' + tin, 0], ['ra: ' + tout, 1]].forEach(([s, i]) => {
+      const w = ctx.measureText(s).width + 12*k, h = 22*k, y = my + 8*k + i*(h + 2*k);
+      ctx.fillStyle = '#fff'; ctx.fillRect(mx_ - w/2, y, w, h); ctx.strokeStyle = '#10161c'; ctx.lineWidth = 1*k; ctx.strokeRect(mx_ - w/2, y, w, h);
+      ctx.fillStyle = '#10161c'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText(s, mx_, y + h/2); ctx.textAlign = 'left';
+    });
+  }
+  drawHud(k);
+  { const sc_ = cur.scene || 'day', col = { day:'#b97a00', dusk:'#d9541e', night:'#2f3f8f' }[sc_];
+    chip(PERIOD_LONG[sc_], 8*k, 8*k + 21*k, col, k); }
+
+  // hiệu chỉnh
+  if (calibPts.length){
+    ctx.strokeStyle = '#ffd400'; ctx.fillStyle = '#ffd400'; ctx.lineWidth = 3*k; ctx.beginPath();
+    calibPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+    calibPts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6*k, 0, 7); ctx.fill(); });
+  }
+  liveCount = live;
+}
+let liveCount = 0, panelDirty = true;
+
+/* ---------- Tương tác với vạch ---------- */
+function toVid(e){
+  const r = ov.getBoundingClientRect();
+  return { x:(e.clientX - r.left) * ov.width / r.width, y:(e.clientY - r.top) * ov.height / r.height };
+}
+ov.addEventListener('pointerdown', e => {
+  if (!cur) return;
+  const p = toVid(e), r = ov.getBoundingClientRect(), k = ov.width / r.width;
+  if (tool === 'calib'){
+    calibPts.push(p);
+    if (calibPts.length === 2){ $('#calibForm').classList.remove('hidden'); $('#calibM').focus(); setHint('Nhập khoảng cách thật giữa hai điểm vàng rồi bấm Áp dụng.'); tool = 'calibwait'; }
+    return;
+  }
+  if (tool !== 'line' || !cur.line) return;
+  const L = cur.line;
+  for (const key of ['a', 'b']){
+    if (Math.hypot(p.x - L[key].x, p.y - L[key].y) < 26 * k){ drag = key; ov.setPointerCapture(e.pointerId); return; }
+  }
+});
+ov.addEventListener('pointermove', e => {
+  if (!drag) return; const p = toVid(e);
+  cur.line[drag] = { x:Math.min(ov.width, Math.max(0, p.x)), y:Math.min(ov.height, Math.max(0, p.y)) };
+  tracks.forEach(t => t.counted = t.counted);
+});
+ov.addEventListener('pointerup', () => { drag = null; });
+
+function setHint(s){ $('#hint').textContent = s; }
+
+$('#resetLine').onclick = () => { if (!cur) return; const w = ov.width, h = ov.height; cur.line = { a:{x:w*0.04, y:h*0.78}, b:{x:w*0.96, y:h*0.58} }; tracks.forEach(t => t.counted = false); };
+$('#flip').onclick = () => { if (cur){ cur.flip = !cur.flip; setHint('Đã đổi chiều vào/ra của vạch.'); } };
+$('#calibBtn').onclick = () => {
+  if (!cur) return; tool = 'calib'; calibPts = []; $('#calibForm').classList.add('hidden');
+  setHint('Bấm 2 điểm trên mặt đường có độ dài đã biết, ví dụ một đoạn vạch kẻ đường dài 3 mét.');
+};
+$('#calibForm').onsubmit = e => {
+  e.preventDefault();
+  const m = parseFloat($('#calibM').value), px = Math.hypot(calibPts[1].x - calibPts[0].x, calibPts[1].y - calibPts[0].y);
+  if (m > 0 && px > 4){ cur.mpp = m / px; cur.calibrated = true; setHint('Đã hiệu chỉnh: 1 điểm ảnh bằng ' + (cur.mpp * 100).toFixed(1) + ' cm tại vị trí vừa chọn.'); }
+  calibPts = []; tool = 'line'; $('#calibForm').classList.add('hidden'); syncControls();
+};
+
+/* ---------- Bảng số liệu ---------- */
+function refreshPanels(){
+  const box = $('#tally'); box.innerHTML = '';
+  let total = 0;
+  KEYS.forEach(c => {
+    const v = cur ? cur.counts[c] : { in:0, out:0 }, sum = v.in + v.out; total += sum;
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<span class="dot" style="background:' + CLS[c].c + '"></span>' +
+      '<div><div class="nm">' + CLS[c].n + '</div><div class="sub">vào ' + v.in + ', ra ' + v.out + '</div></div>' +
+      '<div class="big">' + sum + '</div>';
+    box.appendChild(row);
+  });
+  $('#total').textContent = total;
+  const tb = $('#log'); tb.innerHTML = '';
+  (cur ? cur.log.slice(0, 60) : []).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="num">' + r.t.toFixed(1) + '</td><td>' + CLS[r.cls].n + '</td><td class="dir-' + r.dir + '">' + (r.dir === 'in' ? 'Vào' : 'Ra') + '</td><td class="num">' + (r.kmh || '') + '</td><td>' + PERIOD[r.per || 'day'] + '</td>';
+    tb.appendChild(tr);
+  });
+  panelDirty = false;
+}
+setInterval(() => {
+  if (panelDirty) refreshPanels();
+  $('#liveNote').textContent = 'Đang trong khung hình: ' + liveCount;
+  $('#periodNote').textContent = cur
+    ? 'Hiện tại: ' + PERIOD_LONG[cur.scene || 'day'] + (cur.luma != null ? ' (độ sáng ' + Math.round(cur.luma) + '/255)' : '') +
+      '. Xe qua vạch: ngày ' + cur.byPeriod.day + ', chạng vạng ' + cur.byPeriod.dusk + ', đêm ' + cur.byPeriod.night + '.'
+    : 'Thời điểm: chưa có video';
+  updateStatus();
+}, 400);
+
+/* ---------- Nút điều khiển ---------- */
+$('#play').onclick = () => { if (!cur) return; (vid.paused || vid.ended) ? vid.play() : vid.pause(); };
+let seeking = false;
+$('#seek').addEventListener('input', e => { seeking = true; if (vid.duration) vid.currentTime = e.target.value / 1000 * vid.duration; });
+$('#seek').addEventListener('change', () => { seeking = false; });
+$('#rate').onchange = e => { effRate = +e.target.value; vid.playbackRate = effRate; };
+$('#mute').onclick = () => { vid.muted = !vid.muted; $('#mute').textContent = vid.muted ? 'Bật tiếng' : 'Tắt tiếng'; };
+$('#optLoop').onchange = e => { if (cur && !cur.stream) vid.loop = e.target.checked; };
+$('#dn').onchange = () => { if (cur){ cur.luma = null; sampleScene(true); } };
+$('#mode').onchange = () => { if ($('#mode').value !== 'motion') ensureModel(); updateStatus(); };
+$('#base').onchange = () => { if ($('#mode').value !== 'motion') ensureModel(); };
+
+$('#addFile').onclick = $('#emptyPick').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('#addUrl').onclick = () => { $('#urlForm').classList.toggle('hidden'); $('#urlIn').focus(); };
+$('#urlForm').onsubmit = e => {
+  e.preventDefault(); const u = $('#urlIn').value.trim(); if (!u) return;
+  addSource({ name:u.split('/').pop().split('?')[0] || 'Video từ link', url:u }); $('#urlIn').value = ''; $('#urlForm').classList.add('hidden');
+  setHint('Video từ link cần máy chủ cho phép truy cập chéo (CORS). Nếu không nhận dạng được, hãy tải video về rồi chọn file.');
+};
+$('#addCam').onclick = async () => {
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+    addSource({ name:'Camera thiết bị', stream });
+  }catch(e){ setHint('Không mở được camera: hãy cho phép truy cập camera, hoặc mở file này qua https hay localhost.'); }
+};
+$('#clear').onclick = () => { if (!cur) return; cur.counts = newCounts(); cur.byPeriod = { day:0, dusk:0, night:0 }; cur.log = []; tracks.forEach(t => t.counted = false); refreshPanels(); };
+$('#csv').onclick = () => {
+  if (!cur) return;
+  const rows = ['thoi_gian_giay,ma_theo_doi,loai,huong,toc_do_kmh,thoi_diem'].concat(cur.log.slice().reverse().map(r =>
+    [r.t.toFixed(2), r.id, CLS[r.cls].n, r.dir === 'in' ? 'vao' : 'ra', r.kmh, PERIOD[r.per || 'day']].join(',')));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type:'text/csv;charset=utf-8' }));
+  a.download = 'giam_sat_xe_' + cur.name.replace(/\.[^.]+$/, '') + '.csv'; a.click();
+};
+$('#snap').onclick = () => {
+  if (!cur || !vid.videoWidth) return;
+  const c = document.createElement('canvas'); c.width = vid.videoWidth; c.height = vid.videoHeight;
+  const g = c.getContext('2d'); g.drawImage(vid, 0, 0); g.drawImage(ov, 0, 0);
+  c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'anh_giam_sat.png'; a.click(); });
+};
+addEventListener('keydown', e => {
+  if (e.code === 'Space' && !/INPUT|SELECT|BUTTON|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); $('#play').click(); }
+});
+
+/* ---------- Kéo thả ---------- */
+['dragenter', 'dragover'].forEach(ev => addEventListener(ev, e => { e.preventDefault(); document.body.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => addEventListener(ev, e => { e.preventDefault(); if (ev === 'drop' || e.target === document.documentElement) document.body.classList.remove('drag'); }));
+addEventListener('drop', e => { document.body.classList.remove('drag'); if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+/* ---------- Khởi động ---------- */
+renderCams(); refreshPanels(); fit(); syncControls(); updateStatus();
+ensureModel();
+requestAnimationFrame(draw);
+detectLoop();
+</script>
+</body>
+</html>
